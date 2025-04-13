@@ -1,4 +1,4 @@
-# MPI Assignment - Spring 2025
+# MPI Problems
 
 ## Overview
 This repository contains two problems implemented in C using the MPI (Message Passing Interface) library. Both problems are based on parallel programming using the **Master-Slave** paradigm and **MPI_Send**/**MPI_Recv** for communication.
