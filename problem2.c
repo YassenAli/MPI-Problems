@@ -129,7 +129,30 @@ void mainMenu() {
 }
 
 int main(int argc, char* argv[]) {
-    char input[200];
+    int file_mode = 0;
+    char *file_input = NULL;
+    int file_len = 0;
+
+    // Detect file input mode if a filename is provided as a command-line argument
+    if (argc > 1) {
+        file_mode = 1;
+        FILE *fp = fopen(argv[1], "r");
+        if (!fp) {
+            perror("Error opening file");
+            return EXIT_FAILURE;
+        }
+        fseek(fp, 0, SEEK_END);
+        long fsize = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        file_input = (char*)malloc(fsize + 1);
+        fread(file_input, 1, fsize, fp);
+        file_input[fsize] = '\0';
+        file_len = (int)fsize;
+        fclose(fp);
+    }
+
+    char input_buf[200];
+    char *input = input_buf;
     char final_output[200];
 
     MPI_Init(&argc, &argv);
@@ -142,53 +165,63 @@ int main(int argc, char* argv[]) {
     while (1) {
         if (choice == 3) break;
 
+        // Broadcast the mode choice
         if (rank == 0) {
             mainMenu();
             scanf("%d", &choice);
-
             for (int p = 1; p < number_of_processes; p++) {
                 MPI_Send(&choice, 1, MPI_INT, p, 0, MPI_COMM_WORLD);
             }
-        }
-        else {
+        } else {
             MPI_Recv(&choice, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
 
         int n;
+        // Read input from console or file on rank 0
         if (rank == 0) {
-            printf("Enter the string to be %s: ", (choice == 1) ? "encrypted" : "decrypted");
-            fflush(stdout);
-            scanf("%s", input);
-            n = strlen(input);
+            if (file_mode) {
+                input = file_input;
+                n = file_len;
+                printf("Read %d characters from file '%s'.\n", n, argv[1]);
+            } else {
+                printf("Enter the string to be %s: ", (choice == 1) ? "encrypted" : "decrypted");
+                fflush(stdout);
+                scanf("%199s", input_buf);
+                n = strlen(input_buf);
+            }
+            // Send input length and data to other processes
             for (int p = 1; p < number_of_processes; p++) {
                 MPI_Send(&n, 1, MPI_INT, p, 0, MPI_COMM_WORLD);
                 MPI_Send(input, n, MPI_CHAR, p, 0, MPI_COMM_WORLD);
             }
-        }
-        else {
+        } else {
             MPI_Recv(&n, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Recv(input, n, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(input_buf, n, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            input = input_buf;
         }
 
-        char *result = (choice == 1) ? encrypt(argc, argv, input, n) : decrypt(argc, argv, input, n);
+        char *result = (choice == 1)
+                         ? encrypt(argc, argv, input, n)
+                         : decrypt(argc, argv, input, n);
 
         if (rank == 0) {
-            printf("%s\n", result);
+            printf("Result: %s\n", result);
             free(result);
             choice = 3;
             for (int p = 1; p < number_of_processes; p++) {
                 MPI_Send(&choice, 1, MPI_INT, p, 0, MPI_COMM_WORLD);
             }
-        }
-        else {
+        } else {
             MPI_Recv(&choice, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     }
 
     MPI_Finalize();
 
+    if (file_input) free(file_input);
     return 0;
 }
+
 
 //
 //MPI_Init(&argc, &argv);
