@@ -12,11 +12,12 @@ int main(int argc, char *argv[]) {
     if(rank==0){
         printf("Hello from master process.\n");
         fflush(stdout);
-	printf("Number of slave processes is %d\n", numprocs - 1);
+        printf("Number of slave processes is %d\n", numprocs - 1);
+        fflush(stdout);
         int n;
         printf("Enter the size of the array: ");
         fflush(stdout);
-	scanf("%d", &n);
+	    scanf("%d", &n);
         int *array = (int *)malloc(n * sizeof(int));
         printf("\nEnter the elements of the array:\n");
         fflush(stdout);
